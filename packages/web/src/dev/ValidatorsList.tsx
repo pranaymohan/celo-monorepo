@@ -35,11 +35,16 @@ const validatorGroupsMock = new Array(10).fill(0).map((_, i) => ({
   })),
 }))
 
+interface ValidatorsListProps {
+  validatorsData: any
+  isLoading: boolean
+}
+
 export interface State {
   expanded?: number
 }
 
-class ValidatorsListApp extends React.PureComponent<I18nProps, State> {
+class ValidatorsListApp extends React.PureComponent<ValidatorsListProps & I18nProps, State> {
   state = {
     expanded: undefined,
   }
@@ -49,7 +54,7 @@ class ValidatorsListApp extends React.PureComponent<I18nProps, State> {
   }
 
   formatNumber(n: number, decimals: number = Infinity) {
-    return n.toFixed(decimals).replace(/\B(?=(\d{3})+(?!\d))/g, ',')
+    return isNaN(n) ? 'n/a' : n.toFixed(decimals).replace(/\B(?=(\d{3})+(?!\d))/g, ',')
   }
 
   copyAddress(address: string) {
@@ -64,8 +69,26 @@ class ValidatorsListApp extends React.PureComponent<I18nProps, State> {
     }
   }
 
+  cleanData(groups: any) {
+    return groups.map(({ account, affiliates }) => {
+      const { address, name, lockedGold } = account.edges[0].node
+      return {
+        name,
+        address,
+        gold: lockedGold / 10 ** 18,
+        validators: affiliates.edges.map((validator) => {
+          const { address } = validator.node
+          return { address }
+        }),
+      }
+    })
+  }
+
   render() {
     const { expanded } = this.state
+    const { validatorsData } = this.props
+    console.log({ validatorsData, validatorGroupsMock })
+    const validatorGroups = validatorsData ? this.cleanData(validatorsData) : []
     return (
       <View style={styles.cover}>
         <View style={styles.container}>
@@ -73,131 +96,145 @@ class ValidatorsListApp extends React.PureComponent<I18nProps, State> {
             Validator Explorer
           </H1>
           <table className={[css['table'], css['main-table']].join(' ')}>
-            <tr className={css['table__heading']}>
-              <th className={css['table__cell--title-padding']}>Name</th>
-              <th className={css['table__cell--center']}>Elected</th>
-              <th className={css['table__cell--center']}>Online</th>
-              <th>Address</th>
-              <th className={css['table__cell--center']}>Votes received</th>
-              <th className={css['table__cell--center']}>CUSD</th>
-              <th className={css['table__cell--center']}>CGLD</th>
-              <th className={css['table__cell--center']}>Uptime</th>
-            </tr>
-            {validatorGroupsMock.map((group, i) => (
-              <>
-                <tr key={i}>
-                  <td
-                    onClick={() => this.expand(i)}
-                    className={[css['table__cell--title'], css['table__cell--clickable']].join(' ')}
-                  >
-                    <span className={css['table__cell--title-arrow']}>
-                      <Chevron
-                        direction={i === expanded ? Direction.down : Direction.right}
-                        opacity={i === expanded ? 1 : 0.4}
-                        color={colors.white}
-                        size={10}
-                      />
-                    </span>
-                    {group.name}
-                  </td>
-                  <td
-                    className={[
-                      css[`table__cell--${group.elected ? '' : 'error-'}hightlight`],
-                      css['table__cell--center'],
-                    ].join(' ')}
-                  >
-                    {group.elected}
-                  </td>
-                  <td
-                    className={[
-                      css[`table__cell--${group.online ? '' : 'error-'}hightlight`],
-                      css['table__cell--center'],
-                    ].join(' ')}
-                  >
-                    {group.online}
-                  </td>
-                  <td>
-                    {this.cutAddress(group.address)}
-                    <span className={css.copy} onClick={() => this.copyAddress(group.address)}>
-                      copy
-                    </span>
-                  </td>
-                  <td className={css['table__cell--center']}>{group.votes.toFixed(2)}%</td>
-                  <td className={css['table__cell--center']}>{this.formatNumber(group.usd, 2)}</td>
-                  <td className={css['table__cell--center']}>{this.formatNumber(group.gold, 2)}</td>
-                  <td className={css['table__cell--center']}>{group.uptime.toFixed(1)}%</td>
-                </tr>
-                {i === expanded && (
-                  <tr>
-                    <td colSpan={8}>
-                      <div className={css['validator-list-expansion']}>
-                        <div className={css['validator-list-expansion__description']}>
-                          {group.description}
-                        </div>
-                        {group.validators && (
-                          <table
-                            className={[
-                              css['table'],
-                              css['table--secondary'],
-                              css['validator-list-expansion__table'],
-                            ].join(' ')}
-                          >
-                            <tr className={css['table__heading']}>
-                              <th>Name</th>
-                              <th className={css['table__cell--center']}>Elected</th>
-                              <th className={css['table__cell--center']}>Online</th>
-                              <th>Address</th>
-                              <th className={css['table__cell--center']}>CUSD</th>
-                              <th className={css['table__cell--center']}>CGLD</th>
-                              <th className={css['table__cell--center']}>Uptime</th>
-                            </tr>
-                            {group.validators.map((validator, j) => (
-                              <tr key={`${i}.${j}`}>
-                                <td className={css['table__cell--title']}>{validator.name}</td>
-                                <td className={css['table__cell--center']}>
-                                  <span
-                                    className={[
-                                      css['circle'],
-                                      css[`circle--${validator.elected ? 'ok' : 'error'}`],
-                                    ].join(' ')}
-                                  />
-                                </td>
-                                <td className={css['table__cell--center']}>
-                                  <span
-                                    className={[
-                                      css['circle'],
-                                      css[`circle--${validator.online ? 'ok' : 'error'}`],
-                                    ].join(' ')}
-                                  />
-                                </td>
-                                <td>
-                                  {this.cutAddress(validator.address)}
-                                  <span
-                                    className={css.copy}
-                                    onClick={() => this.copyAddress(validator.address)}
-                                  >
-                                    copy
-                                  </span>
-                                </td>
-                                <td className={css['table__cell--center']}>
-                                  {this.formatNumber(validator.usd, 2)}
-                                </td>
-                                <td className={css['table__cell--center']}>
-                                  {this.formatNumber(validator.gold, 2)}
-                                </td>
-                                <td className={css['table__cell--center']}>
-                                  {validator.uptime.toFixed(1)}%
-                                </td>
-                              </tr>
-                            ))}
-                          </table>
-                        )}
-                      </div>
+            <thead>
+              <tr className={css['table__heading']}>
+                <th className={css['table__cell--title-padding']}>Name</th>
+                <th className={css['table__cell--center']}>Elected</th>
+                <th className={css['table__cell--center']}>Online</th>
+                <th>Address</th>
+                <th className={css['table__cell--center']}>Votes received</th>
+                <th className={css['table__cell--center']}>CUSD</th>
+                <th className={css['table__cell--center']}>CGLD</th>
+                <th className={css['table__cell--center']}>Uptime</th>
+              </tr>
+            </thead>
+            <tbody>
+              {validatorGroups.map((group, i) => (
+                <>
+                  <tr key={i}>
+                    <td
+                      onClick={() => this.expand(i)}
+                      className={[css['table__cell--title'], css['table__cell--clickable']].join(
+                        ' '
+                      )}
+                    >
+                      <span className={css['table__cell--title-arrow']}>
+                        <Chevron
+                          direction={i === expanded ? Direction.down : Direction.right}
+                          opacity={i === expanded ? 1 : 0.4}
+                          color={colors.white}
+                          size={10}
+                        />
+                      </span>
+                      {group.name}
+                    </td>
+                    <td
+                      className={[
+                        css[`table__cell--${group.elected ? '' : 'error-'}hightlight`],
+                        css['table__cell--center'],
+                      ].join(' ')}
+                    >
+                      {group.elected}
+                    </td>
+                    <td
+                      className={[
+                        css[`table__cell--${group.online ? '' : 'error-'}hightlight`],
+                        css['table__cell--center'],
+                      ].join(' ')}
+                    >
+                      {group.online}
+                    </td>
+                    <td>
+                      {this.cutAddress(group.address)}
+                      <span className={css.copy} onClick={() => this.copyAddress(group.address)}>
+                        copy
+                      </span>
+                    </td>
+                    <td className={css['table__cell--center']}>
+                      {this.formatNumber(group.votes, 2)}%
+                    </td>
+                    <td className={css['table__cell--center']}>
+                      {this.formatNumber(group.usd, 2)}
+                    </td>
+                    <td className={css['table__cell--center']}>
+                      {this.formatNumber(group.gold, 2)}
+                    </td>
+                    <td className={css['table__cell--center']}>
+                      {this.formatNumber(group.uptime, 1)}%
                     </td>
                   </tr>
-                )}
-              </>
-            ))}
+                  {i === expanded && (
+                    <tr>
+                      <td colSpan={8}>
+                        <div className={css['validator-list-expansion']}>
+                          <div className={css['validator-list-expansion__description']}>
+                            {group.description}
+                          </div>
+                          {group.validators && (
+                            <table
+                              className={[
+                                css['table'],
+                                css['table--secondary'],
+                                css['validator-list-expansion__table'],
+                              ].join(' ')}
+                            >
+                              <tr className={css['table__heading']}>
+                                <th>Name</th>
+                                <th className={css['table__cell--center']}>Elected</th>
+                                <th className={css['table__cell--center']}>Online</th>
+                                <th>Address</th>
+                                <th className={css['table__cell--center']}>CUSD</th>
+                                <th className={css['table__cell--center']}>CGLD</th>
+                                <th className={css['table__cell--center']}>Uptime</th>
+                              </tr>
+                              {group.validators.map((validator, j) => (
+                                <tr key={`${i}.${j}`}>
+                                  <td className={css['table__cell--title']}>{validator.name}</td>
+                                  <td className={css['table__cell--center']}>
+                                    <span
+                                      className={[
+                                        css['circle'],
+                                        css[`circle--${validator.elected ? 'ok' : 'error'}`],
+                                      ].join(' ')}
+                                    />
+                                  </td>
+                                  <td className={css['table__cell--center']}>
+                                    <span
+                                      className={[
+                                        css['circle'],
+                                        css[`circle--${validator.online ? 'ok' : 'error'}`],
+                                      ].join(' ')}
+                                    />
+                                  </td>
+                                  <td>
+                                    {this.cutAddress(validator.address)}
+                                    <span
+                                      className={css.copy}
+                                      onClick={() => this.copyAddress(validator.address)}
+                                    >
+                                      copy
+                                    </span>
+                                  </td>
+                                  <td className={css['table__cell--center']}>
+                                    {this.formatNumber(validator.usd, 2)}
+                                  </td>
+                                  <td className={css['table__cell--center']}>
+                                    {this.formatNumber(validator.gold, 2)}
+                                  </td>
+                                  <td className={css['table__cell--center']}>
+                                    {this.formatNumber(validator.uptime, 1)}%
+                                  </td>
+                                </tr>
+                              ))}
+                            </table>
+                          )}
+                        </div>
+                      </td>
+                    </tr>
+                  )}
+                </>
+              ))}
+            </tbody>
           </table>
         </View>
       </View>
